@@ -1,0 +1,50 @@
+services:
+  video-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vison-video-service
+    environment:
+      - VIDEO_SOURCE=usb  # Options: test (default), usb, rtsp
+      - VIDEO_DEVICE=/dev/video0
+      - RTSP_URL=rtsp://192.168.1.100:8554/stream
+      - USE_GPU=true
+      - RECORDINGS_DIR=/app/recordings
+      - HLS_DIR=/app/hls
+    volumes:
+      - ./recordings:/app/recordings
+      - ./gst:/app/gst
+    devices:
+      - /dev/video0:/dev/video0
+    cap_add:
+      - CAP_SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    ports:
+      - "8000:8000"
+      - "8554:8554"
+    networks:
+      - vison-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vison-web-ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - video-service
+    networks:
+      - vison-network
+    restart: unless-stopped
+
+networks:
+  vison-network:
+    driver: bridge
